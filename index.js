@@ -103,6 +103,22 @@ async function run() {
     });
 
 
+    app.patch("/users/premium/:email", async (req, res) => {
+      const email = req.params.email;
+
+      const query = { email };
+      const updateDoc = {
+        $set: {
+          isPremium: true,
+          premiumAt: new Date(),
+        },
+      };
+
+      const result = await usersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+
     
     
     
