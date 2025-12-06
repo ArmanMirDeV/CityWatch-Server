@@ -153,6 +153,32 @@ async function run() {
     });
 
 
+    app.patch("/issues/upvote/:id", async (req, res) => {
+      const id = req.params.id;
+      const userEmail = req.body.userEmail;
+
+      const query = { _id: new ObjectId(id) };
+      const issue = await issuesCollection.findOne(query);
+
+      if (!issue) return res.status(404).send({ message: "Issue not found" });
+
+      if (issue.userEmail === userEmail)
+        return res
+          .status(400)
+          .send({ message: "You cannot upvote your own issue" });
+
+      if (issue.upvotes.includes(userEmail))
+        return res.status(400).send({ message: "Already upvoted" });
+
+      const result = await issuesCollection.updateOne(query, {
+        $push: { upvotes: userEmail },
+        $set: { updatedAt: new Date() },
+      });
+
+      res.send(result);
+    });
+
+
 
 
 
