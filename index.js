@@ -88,6 +88,21 @@ async function run() {
     });
 
 
+
+    app.patch("/users/block/:email", async (req, res) => {
+      const email = req.params.email;
+      const { isBlocked } = req.body; // true or false
+
+      const query = { email };
+      const updateDoc = {
+        $set: { isBlocked },
+      };
+
+      const result = await usersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+
     
     
     
