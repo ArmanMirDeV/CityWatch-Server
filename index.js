@@ -69,6 +69,25 @@ async function run() {
       res.send(result);
     });
 
+
+
+    app.put("/users/:email", async (req, res) => {
+      const email = req.params.email;
+      const updatedInfo = req.body;
+
+      const query = { email };
+      const updateDoc = {
+        $set: {
+          ...updatedInfo,
+          updatedAt: new Date(),
+        },
+      };
+
+      const result = await usersCollection.updateOne(query, updateDoc);
+      res.send(result);
+    });
+
+
     
     
     
