@@ -34,7 +34,15 @@ async function run() {
     // Connect the client to the server	(optional starting in v4.7)
       await client.connect();
 
-      const usersCollection = client.db("cityWatch").collection("users");
+    const usersCollection = client.db("cityWatch").collection("users");
+    const issuesCollection = client.db("cityWatch").collection("issues");
+
+
+
+
+
+
+    // Users APIs
 
       app.post("/users", async (req, res) => {
         const user = req.body;
@@ -49,6 +57,32 @@ async function run() {
       
 
 
+    // Issues APIs
+    
+    app.post("/issues", async (req, res) => {
+      const issue = req.body;
+
+      const newIssue = {
+        ...issue,
+        status: "pending", 
+        priority: "normal", 
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        upvotes: [], 
+        assignedStaff: null,
+        timeline: [
+          {
+            status: "pending",
+            message: "Issue created by citizen",
+            updatedBy: issue.userEmail,
+            date: new Date(),
+          },
+        ],
+      };
+
+      const result = await issuesCollection.insertOne(newIssue);
+      res.send(result);
+    });
 
       
 
