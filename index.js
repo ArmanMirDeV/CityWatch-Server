@@ -55,6 +55,17 @@ async function run() {
         res.send(result);
       });
       
+    
+  app.get("/users", async (req, res) => {
+    const cursor = usersCollection.find().sort({ createdAt: -1 });
+    const result = await cursor.toArray();
+    res.send(result);
+  });
+
+    
+    
+    
+    
 
 
     // Issues APIs
