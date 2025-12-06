@@ -182,6 +182,36 @@ async function run() {
 
 
 
+    app.patch("/issues/boost/:id", async (req, res) => {
+      const id = req.params.id;
+      const userEmail = req.body.userEmail;
+
+      const query = { _id: new ObjectId(id) };
+      const issue = await issuesCollection.findOne(query);
+
+      if (!issue) return res.status(404).send({ message: "Issue not found" });
+
+      if (issue.priority === "high")
+        return res.status(400).send({ message: "Already boosted" });
+
+      const result = await issuesCollection.updateOne(query, {
+        $set: { priority: "high", updatedAt: new Date() },
+        $push: {
+          timeline: {
+            status: issue.status,
+            message: "Issue priority boosted by citizen",
+            updatedBy: userEmail,
+            date: new Date(),
+          },
+        },
+      });
+
+      res.send(result);
+    });
+
+
+
+
 
 
 
