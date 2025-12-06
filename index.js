@@ -86,6 +86,15 @@ async function run() {
 
       
 
+    app.get("/issues", async (req, res) => {
+      const cursor = issuesCollection
+        .find()
+        .sort({ priority: -1, createdAt: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
+
+
 
 
 
