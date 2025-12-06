@@ -243,6 +243,33 @@ async function run() {
 
 
 
+    app.patch("/issues/status/:id", async (req, res) => {
+      const id = req.params.id;
+      const { newStatus, staffEmail } = req.body;
+
+      const query = { _id: new ObjectId(id) };
+      const issue = await issuesCollection.findOne(query);
+
+      const result = await issuesCollection.updateOne(query, {
+        $set: { status: newStatus, updatedAt: new Date() },
+        $push: {
+          timeline: {
+            status: newStatus,
+            message: `Status updated to ${newStatus}`,
+            updatedBy: staffEmail,
+            date: new Date(),
+          },
+        },
+      });
+
+      res.send(result);
+    });
+
+
+
+
+
+
 
 
 
