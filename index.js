@@ -106,6 +106,43 @@ async function run() {
 
 
 
+    app.put("/issues/:id", async (req, res) => {
+      const id = req.params.id;
+      const updateData = req.body;
+
+      const query = { _id: new ObjectId(id) };
+      const issue = await issuesCollection.findOne(query);
+
+      if (!issue) return res.status(404).send({ message: "Issue not found" });
+      if (issue.status !== "pending")
+        return res
+          .status(400)
+          .send({ message: "Only pending issues can be edited" });
+
+      const updatedIssue = {
+        $set: {
+          title: updateData.title,
+          description: updateData.description,
+          category: updateData.category,
+          location: updateData.location,
+          image: updateData.image,
+          updatedAt: new Date(),
+        },
+        $push: {
+          timeline: {
+            status: issue.status,
+            message: "Issue was edited",
+            updatedBy: updateData.userEmail,
+            date: new Date(),
+          },
+        },
+      };
+
+      const result = await issuesCollection.updateOne(query, updatedIssue);
+      res.send(result);
+    });
+
+
 
 
 
