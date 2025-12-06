@@ -213,6 +213,34 @@ async function run() {
 
 
 
+    app.patch("/issues/assign/:id", async (req, res) => {
+      const id = req.params.id;
+      const staffEmail = req.body.staffEmail;
+      const adminEmail = req.body.adminEmail;
+
+      const query = { _id: new ObjectId(id) };
+      const issue = await issuesCollection.findOne(query);
+
+      if (issue.assignedStaff)
+        return res.status(400).send({ message: "Staff already assigned" });
+
+      const result = await issuesCollection.updateOne(query, {
+        $set: { assignedStaff: staffEmail, updatedAt: new Date() },
+        $push: {
+          timeline: {
+            status: issue.status,
+            message: `Issue assigned to staff: ${staffEmail}`,
+            updatedBy: adminEmail,
+            date: new Date(),
+          },
+        },
+      });
+
+      res.send(result);
+    });
+
+
+
 
 
 
