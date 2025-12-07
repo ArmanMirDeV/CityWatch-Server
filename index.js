@@ -344,6 +344,11 @@ app.post("/staff", async (req, res) => {
       res.send(result);
     });
 
+app.delete("/staff/:id", async (req, res) => {
+  const id = req.params.id;
+  const result = await staffCollection.deleteOne({ _id: new ObjectId(id) });
+  res.send(result);
+});
 
 
 
