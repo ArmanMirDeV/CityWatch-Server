@@ -394,6 +394,32 @@ app.delete("/staff/:id", async (req, res) => {
     });
 
 
+    app.patch("/issues/:id/status", async (req, res) => {
+      const id = req.params.id;
+      const { newStatus, updatedBy } = req.body;
+
+      const statusTimelineRecord = {
+        status: newStatus,
+        message: `Status changed to ${newStatus}`,
+        updatedBy,
+        date: new Date(),
+      };
+
+      const result = await issuesCollection.updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            status: newStatus,
+            updatedAt: new Date(),
+          },
+          $push: { timeline: statusTimelineRecord },
+        }
+      );
+
+      res.send(result);
+    });
+
+
 
 
 
