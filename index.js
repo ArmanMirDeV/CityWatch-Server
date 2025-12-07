@@ -330,6 +330,20 @@ app.post("/staff", async (req, res) => {
     });
 
 
+    app.patch("/staff/:id", async (req, res) => {
+      const id = req.params.id;
+      const updatedData = req.body;
+
+      updatedData.updatedAt = new Date();
+
+      const result = await staffCollection.updateOne(
+        { _id: new ObjectId(id) },
+        { $set: updatedData }
+      );
+
+      res.send(result);
+    });
+
 
 
 
