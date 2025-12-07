@@ -31,6 +31,25 @@ async function run() {
 
     // Users APIs
 
+    // Auth API
+    app.post("/auth/login", async (req, res) => {
+        const { email, password } = req.body;
+        
+        // 1. Check Staff
+        const staff = await staffCollection.findOne({ email, password });
+        if (staff) {
+            return res.send({ success: true, user: { ...staff, role: 'staff' } });
+        }
+
+        // 2. Check Admin (in Users)
+        const user = await usersCollection.findOne({ email, password });
+        if (user && user.role === 'admin') {
+             return res.send({ success: true, user: { ...user, role: 'admin' } });
+        }
+
+        return res.status(401).send({ success: false, message: "Invalid credentials or not authorized for DB login" });
+    });
+
     app.post("/users", async (req, res) => {
       const user = req.body;
       const query = { email: user.email };
@@ -97,6 +116,26 @@ async function run() {
 
       const result = await usersCollection.updateOne(query, updateDoc);
       res.send(result);
+    });
+
+    app.get("/users/role/:email", async (req, res) => {
+      const email = req.params.email;
+      let role = "citizen";
+
+      // Check users collection (for admin/citizen)
+      const user = await usersCollection.findOne({ email });
+      if (user) {
+          if (user.role === 'admin') role = 'admin';
+          // If user exists but no specific role, default is citizen
+      }
+
+      // Check staff collection (override if found in staff)
+      const staff = await staffCollection.findOne({ email });
+      if (staff) {
+          role = 'staff';
+      }
+
+      res.send({ role });
     });
 
     app.delete("/users/:email", async (req, res) => {
@@ -374,7 +413,8 @@ async function run() {
       if (issue.assignedStaff)
         return res.status(400).send({ message: "Staff already assigned" });
 
-      const result = await issuesCollection.updateOne(query, {
+      // 1. Update Issue
+      const issueResult = await issuesCollection.updateOne(query, {
         $set: { assignedStaff: staffEmail, updatedAt: new Date() },
         $push: {
           timeline: {
@@ -386,7 +426,15 @@ async function run() {
         },
       });
 
-      res.send(result);
+      // 2. Update Staff's assignedIssues
+      const staffQuery = { email: staffEmail };
+      const staffUpdate = {
+          $push: { assignedIssues: id } // Store ID as string since original is string/objectID mix usually safely handled as string in arrays
+      };
+      
+      const staffResult = await staffCollection.updateOne(staffQuery, staffUpdate);
+
+      res.send({ issueResult, staffResult, modifiedCount: issueResult.modifiedCount });
     });
 
     app.patch("/issues/status/:id", async (req, res) => {
@@ -450,11 +498,37 @@ app.post("/staff", async (req, res) => {
     app.patch("/staff/:id", async (req, res) => {
       const id = req.params.id;
       const updatedData = req.body;
-
       updatedData.updatedAt = new Date();
 
+      const query = { _id: new ObjectId(id) };
+      
+      // Check if email is being updated
+      if (updatedData.email) {
+          const currentStaff = await staffCollection.findOne(query);
+          if (currentStaff && currentStaff.email !== updatedData.email) {
+              // 1. Check Uniqueness
+              const existing = await staffCollection.findOne({ email: updatedData.email });
+              if (existing) {
+                  return res.send({ message: "Email already in use", modifiedCount: 0 });
+              }
+
+              // 2. Cascade Update to Issues
+              const updateIssues = await issuesCollection.updateMany(
+                  { assignedStaff: currentStaff.email },
+                  { $set: { assignedStaff: updatedData.email } }
+              );
+              console.log(`Updated ${updateIssues.modifiedCount} issues for staff email change`);
+              
+              // 3. Update Sync in Users collection (if exists)
+              await usersCollection.updateOne(
+                  { email: currentStaff.email },
+                  { $set: { email: updatedData.email } }
+              );
+          }
+      }
+
       const result = await staffCollection.updateOne(
-        { _id: new ObjectId(id) },
+        query,
         { $set: updatedData }
       );
 
