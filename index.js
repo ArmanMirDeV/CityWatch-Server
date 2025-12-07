@@ -349,6 +349,24 @@ app.delete("/staff/:id", async (req, res) => {
   const result = await staffCollection.deleteOne({ _id: new ObjectId(id) });
   res.send(result);
 });
+    
+    
+    app.get("/staff/:email/issues", async (req, res) => {
+      const email = req.params.email;
+
+      const staff = await staffCollection.findOne({ email });
+      if (!staff) return res.status(404).send({ message: "Staff not found" });
+
+      const issueIds = staff.assignedIssues.map((id) => new ObjectId(id));
+
+      const assignedIssues = await issuesCollection
+        .find({ _id: { $in: issueIds } })
+        .sort({ priority: -1 }) // boosted issues first
+        .toArray();
+
+      res.send(assignedIssues);
+    });
+
 
 
 
