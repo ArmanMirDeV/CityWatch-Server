@@ -368,6 +368,32 @@ app.delete("/staff/:id", async (req, res) => {
     });
 
 
+    app.get("/staff/:email/stats", async (req, res) => {
+      const email = req.params.email;
+
+      const staff = await staffCollection.findOne({ email });
+      if (!staff) return res.status(404).send({ message: "Staff not found" });
+
+      const issueIds = staff.assignedIssues.map((id) => new ObjectId(id));
+
+      const issues = await issuesCollection
+        .find({ _id: { $in: issueIds } })
+        .toArray();
+
+      const stats = {
+        totalAssigned: issues.length,
+        resolved: issues.filter((i) => i.status === "resolved").length,
+        closed: issues.filter((i) => i.status === "closed").length,
+        todayTasks: issues.filter(
+          (i) =>
+            new Date(i.updatedAt).toDateString() === new Date().toDateString()
+        ).length,
+      };
+
+      res.send(stats);
+    });
+
+
 
 
 
