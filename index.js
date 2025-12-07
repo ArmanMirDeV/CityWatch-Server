@@ -7,60 +7,46 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const port = process.env.PORT || 3000;
 
-
-
-
-
 app.use(cors());
 app.use(express.json());
 
-
-
-
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@kajwala.9fiaw1u.mongodb.net/?appName=kajwala`;
 
-
-
-  // Create a MongoClient with a MongoClientOptions object to set the Stable API version
+// Create a MongoClient with a MongoClientOptions object to set the Stable API version
 const client = new MongoClient(uri, {
   serverApi: {
     version: ServerApiVersion.v1,
     strict: true,
     deprecationErrors: true,
-  }
+  },
 });
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-      await client.connect();
+    await client.connect();
 
     const usersCollection = client.db("cityWatch").collection("users");
     const issuesCollection = client.db("cityWatch").collection("issues");
-
-
-
-
-
+    const staffCollection = client.db("cityWatch").collection("staffs");
 
     // Users APIs
 
-      app.post("/users", async (req, res) => {
-        const user = req.body;
-        const query = { email: user.email };
-        const existingUser = await usersCollection.findOne(query);
-        if (existingUser) {
-          return res.send({ message: "user already exists", insertedId: null });
-        }
-        const result = await usersCollection.insertOne(user);
-        res.send(result);
-      });
-      
-    
-  app.get("/users", async (req, res) => {
-    const cursor = usersCollection.find().sort({ createdAt: -1 });
-    const result = await cursor.toArray();
-    res.send(result);
-  });
+    app.post("/users", async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email };
+      const existingUser = await usersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: "user already exists", insertedId: null });
+      }
+      const result = await usersCollection.insertOne(user);
+      res.send(result);
+    });
+
+    app.get("/users", async (req, res) => {
+      const cursor = usersCollection.find().sort({ createdAt: -1 });
+      const result = await cursor.toArray();
+      res.send(result);
+    });
 
     app.get("/users/:email", async (req, res) => {
       const email = req.params.email;
@@ -68,8 +54,6 @@ async function run() {
       const result = await usersCollection.findOne(query);
       res.send(result);
     });
-
-
 
     app.put("/users/:email", async (req, res) => {
       const email = req.params.email;
@@ -87,8 +71,6 @@ async function run() {
       res.send(result);
     });
 
-
-
     app.patch("/users/block/:email", async (req, res) => {
       const email = req.params.email;
       const { isBlocked } = req.body; // true or false
@@ -101,7 +83,6 @@ async function run() {
       const result = await usersCollection.updateOne(query, updateDoc);
       res.send(result);
     });
-
 
     app.patch("/users/premium/:email", async (req, res) => {
       const email = req.params.email;
@@ -118,7 +99,6 @@ async function run() {
       res.send(result);
     });
 
-
     app.delete("/users/:email", async (req, res) => {
       const email = req.params.email;
 
@@ -128,25 +108,18 @@ async function run() {
       res.send(result);
     });
 
-
-    
-    
-    
-    
-
-
     // Issues APIs
-    
+
     app.post("/issues", async (req, res) => {
       const issue = req.body;
 
       const newIssue = {
         ...issue,
-        status: "pending", 
-        priority: "normal", 
+        status: "pending",
+        priority: "normal",
         createdAt: new Date(),
         updatedAt: new Date(),
-        upvotes: [], 
+        upvotes: [],
         assignedStaff: null,
         timeline: [
           {
@@ -162,8 +135,6 @@ async function run() {
       res.send(result);
     });
 
-      
-
     app.get("/issues", async (req, res) => {
       const cursor = issuesCollection
         .find()
@@ -172,17 +143,12 @@ async function run() {
       res.send(result);
     });
 
-
-
-
     app.get("/issues/:id", async (req, res) => {
       const id = req.params.id;
       const query = { _id: new ObjectId(id) };
       const issue = await issuesCollection.findOne(query);
       res.send(issue);
     });
-
-
 
     app.put("/issues/:id", async (req, res) => {
       const id = req.params.id;
@@ -220,8 +186,6 @@ async function run() {
       res.send(result);
     });
 
-
-
     app.delete("/issues/:id", async (req, res) => {
       const id = req.params.id;
 
@@ -229,7 +193,6 @@ async function run() {
       const result = await issuesCollection.deleteOne(query);
       res.send(result);
     });
-
 
     app.patch("/issues/upvote/:id", async (req, res) => {
       const id = req.params.id;
@@ -255,10 +218,6 @@ async function run() {
 
       res.send(result);
     });
-
-
-
-
 
     app.patch("/issues/boost/:id", async (req, res) => {
       const id = req.params.id;
@@ -287,10 +246,6 @@ async function run() {
       res.send(result);
     });
 
-
-
-
-
     app.patch("/issues/assign/:id", async (req, res) => {
       const id = req.params.id;
       const staffEmail = req.body.staffEmail;
@@ -317,10 +272,6 @@ async function run() {
       res.send(result);
     });
 
-
-
-
-
     app.patch("/issues/status/:id", async (req, res) => {
       const id = req.params.id;
       const { newStatus, staffEmail } = req.body;
@@ -344,6 +295,29 @@ async function run() {
     });
 
 
+    
+    //  Stuff CRUD APIs
+
+app.post("/staff", async (req, res) => {
+  const staff = req.body;
+
+  staff.createdAt = new Date();
+  staff.updatedAt = new Date();
+  staff.role = "staff";
+  staff.assignedIssues = staff.assignedIssues || [];
+
+  const query = { email: staff.email };
+  const existingStaff = await staffCollection.findOne(query);
+
+  if (existingStaff) {
+    return res.send({ message: "Staff already exists", insertedId: null });
+  }
+
+  const result = await staffCollection.insertOne(staff);
+  res.send(result);
+});
+
+
 
 
 
@@ -353,15 +327,15 @@ async function run() {
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    console.log(
+      "Pinged your deployment. You successfully connected to MongoDB!"
+    );
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
   }
 }
 run().catch(console.dir);
-
-
 
 app.get("/", (req, res) => {
   res.send("Hello World! CityWatch is Running.");
