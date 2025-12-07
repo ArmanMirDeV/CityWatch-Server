@@ -317,6 +317,12 @@ app.post("/staff", async (req, res) => {
   res.send(result);
 });
 
+    
+    app.get("/staff", async (req, res) => {
+      const result = await staffCollection.find().toArray();
+      res.send(result);
+    });
+
 
 
 
