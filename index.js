@@ -429,7 +429,7 @@ async function run() {
       // 2. Update Staff's assignedIssues
       const staffQuery = { email: staffEmail };
       const staffUpdate = {
-          $push: { assignedIssues: id } // Store ID as string since original is string/objectID mix usually safely handled as string in arrays
+          $push: { assignedIssues: id } 
       };
       
       const staffResult = await staffCollection.updateOne(staffQuery, staffUpdate);
