@@ -136,11 +136,36 @@ async function run() {
     });
 
     app.get("/issues", async (req, res) => {
+      const page = parseInt(req.query.page) || 1;
+      const limit = parseInt(req.query.limit) || 10;
+      const skip = (page - 1) * limit;
+
+      const { search, status, priority, category } = req.query;
+
+      const query = {};
+
+      if (status) query.status = status;
+      if (priority) query.priority = priority;
+      if (category) query.category = category;
+
+      if (search) {
+        query.$or = [
+          { title: { $regex: search, $options: "i" } },
+          { category: { $regex: search, $options: "i" } },
+          { location: { $regex: search, $options: "i" } },
+        ];
+      }
+
+      const totalIssues = await issuesCollection.countDocuments(query);
+      
       const cursor = issuesCollection
-        .find()
-        .sort({ priority: -1, createdAt: -1 });
+        .find(query)
+        .sort({ priority: -1, createdAt: -1 }) // Boosted (high priority) first, then newest
+        .skip(skip)
+        .limit(limit);
+
       const result = await cursor.toArray();
-      res.send(result);
+      res.send({ issues: result, totalCount: totalIssues });
     });
 
     app.get("/issues/:id", async (req, res) => {
