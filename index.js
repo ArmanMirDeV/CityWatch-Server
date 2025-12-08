@@ -190,7 +190,7 @@ async function run() {
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
-        currency: "bdt", // or usd
+        currency: "bdt", 
         payment_method_types: ["card"],
       });
 
