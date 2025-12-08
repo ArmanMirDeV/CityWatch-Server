@@ -268,7 +268,7 @@ async function run() {
             inProgress: issues.filter(i => i.status === 'in-progress').length,
             resolved: issues.filter(i => i.status === 'resolved').length,
             closed: issues.filter(i => i.status === 'closed').length,
-            issuesList: issues // Return full list for My Issues page
+            issuesList: issues 
         };
         
         res.send(stats);
