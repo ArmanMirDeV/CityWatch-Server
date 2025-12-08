@@ -283,6 +283,7 @@ async function run() {
 
       const query = {};
 
+
       if (status) query.status = status;
       if (priority) query.priority = priority;
       if (category) query.category = category;
@@ -299,7 +300,7 @@ async function run() {
       
       const cursor = issuesCollection
         .find(query)
-        .sort({ priority: 1, createdAt: -1 }) // Boosted (high priority) first, then newest
+        .sort({ priority: 1, createdAt: -1 }) 
         .skip(skip)
         .limit(limit);
 
@@ -674,9 +675,9 @@ app.delete("/staff/:id", async (req, res) => {
     app.get("/payments", async (req, res) => {
         try {
             const limit = parseInt(req.query.limit) || 0; 
-            let cursor = client.db("cityWatch").collection("payments").find().sort({ date: -1 }); // Assuming date field exists, or objectId
+            let cursor = client.db("cityWatch").collection("payments").find().sort({ date: -1 }); 
             
-            // If date field is missing in some, sorting by _id (which has timestamp) is safer for "latest"
+           
             cursor = client.db("cityWatch").collection("payments").find().sort({ _id: -1 });
 
             if (limit > 0) {
