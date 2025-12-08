@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -28,6 +29,35 @@ async function run() {
     const usersCollection = client.db("cityWatch").collection("users");
     const issuesCollection = client.db("cityWatch").collection("issues");
     const staffCollection = client.db("cityWatch").collection("staffs");
+
+
+
+
+
+
+
+
+    // Payment API
+    
+   app.post("/create-checkout-session", async (req, res) => {
+     const session = await stripe.checkout.sessions.create({
+       line_items: [
+         {
+           // Provide the exact Price ID (for example, price_1234) of the product you want to sell
+           price: "{{PRICE_ID}}",
+           quantity: 1,
+         },
+       ],
+       mode: "payment",
+       success_url: `${process.env.SITE_DOMAIN}/success=true`,
+     });
+
+     res.redirect(303, session.url);
+   });
+
+
+
+
 
     // Users APIs
 
@@ -165,21 +195,11 @@ async function run() {
 
     app.post("/payments", async (req, res) => {
         const payment = req.body;
-        // Optionally save payment info to a paymentsCollection
-        // For now, we just update the user status as requested by the flow
-        // But the client calls PATCH /users/premium separately? 
-        // Better to handle it here if we want to be atomic, but let's stick to the flexible approach for now or just log it.
-        // The user requirement says "After successful payment the user becomes a premium user".
-        // It's safer to trust the server.
-        // Let's assume the client will handle the database update trigger effectively for this prototype, 
-        // OR we can save the payment and return success.
-        
-        // Let's just create a payments collection for record keeping
+      
         const paymentsCollection = client.db("cityWatch").collection("payments");
         const result = await paymentsCollection.insertOne(payment);
         
-        // We can also trigger the upgrade here, but the client might want to do it cleanly. 
-        // Let's stick to saving the record here.
+     
         res.send(result);
     });
 
@@ -273,7 +293,7 @@ async function run() {
       
       const cursor = issuesCollection
         .find(query)
-        .sort({ priority: -1, createdAt: -1 }) // Boosted (high priority) first, then newest
+        .sort({ priority: 1, createdAt: -1 }) // Boosted (high priority) first, then newest
         .skip(skip)
         .limit(limit);
 
@@ -552,7 +572,7 @@ app.delete("/staff/:id", async (req, res) => {
 
       const assignedIssues = await issuesCollection
         .find({ _id: { $in: issueIds } })
-        .sort({ priority: -1 }) // boosted issues first
+        .sort({ priority: 1 }) // boosted issues first
         .toArray();
 
       res.send(assignedIssues);

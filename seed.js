@@ -27,7 +27,7 @@ async function run() {
             $set: {
                 name: "Test Staff",
                 email: staffEmail,
-                role: "staff", // Explicit role here too
+                role: "staff", 
                 createdAt: new Date()
             }
         },
