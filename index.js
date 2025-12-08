@@ -92,7 +92,13 @@ async function run() {
     });
 
     app.get("/users", async (req, res) => {
-      const cursor = usersCollection.find().sort({ createdAt: -1 });
+      const limit = parseInt(req.query.limit) || 0; // 0 means no limit
+      let cursor = usersCollection.find().sort({ createdAt: -1 });
+      
+      if (limit > 0) {
+          cursor = cursor.limit(limit);
+      }
+
       const result = await cursor.toArray();
       res.send(result);
     });
@@ -636,6 +642,53 @@ app.delete("/staff/:id", async (req, res) => {
 
 
 
+
+
+    // Admin Stats API
+    app.get("/admin/stats", async (req, res) => {
+        try {
+            const totalUsers = await usersCollection.countDocuments();
+            const totalIssues = await issuesCollection.countDocuments();
+            const resolvedIssues = await issuesCollection.countDocuments({ status: "resolved" });
+            const pendingIssues = await issuesCollection.countDocuments({ status: "pending" });
+            const rejectedIssues = await issuesCollection.countDocuments({ status: "rejected" });
+            
+            const payments = await client.db("cityWatch").collection("payments").find().toArray();
+            const totalRevenue = payments.reduce((sum, payment) => sum + (parseFloat(payment.price) || 0), 0);
+
+            res.send({
+                totalUsers,
+                totalIssues,
+                resolvedIssues,
+                pendingIssues,
+                rejectedIssues,
+                totalRevenue
+            });
+        } catch (error) {
+            console.error(error);
+            res.status(500).send({ message: "Failed to fetch stats" });
+        }
+    });
+
+    // Payments GET API
+    app.get("/payments", async (req, res) => {
+        try {
+            const limit = parseInt(req.query.limit) || 0; 
+            let cursor = client.db("cityWatch").collection("payments").find().sort({ date: -1 }); // Assuming date field exists, or objectId
+            
+            // If date field is missing in some, sorting by _id (which has timestamp) is safer for "latest"
+            cursor = client.db("cityWatch").collection("payments").find().sort({ _id: -1 });
+
+            if (limit > 0) {
+                cursor = cursor.limit(limit);
+            }
+            
+            const result = await cursor.toArray();
+            res.send(result);
+        } catch (error) {
+             res.status(500).send({ message: "Failed to fetch payments" });
+        }
+    });
 
 
     // Send a ping to confirm a successful connection
