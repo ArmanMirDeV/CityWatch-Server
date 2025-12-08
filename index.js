@@ -43,7 +43,6 @@ async function run() {
      const session = await stripe.checkout.sessions.create({
        line_items: [
          {
-           // Provide the exact Price ID (for example, price_1234) of the product you want to sell
            price: "{{PRICE_ID}}",
            quantity: 1,
          },
