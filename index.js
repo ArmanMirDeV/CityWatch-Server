@@ -1,6 +1,8 @@
 const express = require("express");
 const app = express();
 require("dotenv").config();
+const jwt = require("jsonwebtoken");
+const cookieParser = require("cookie-parser");
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 const cors = require("cors");
@@ -8,8 +10,14 @@ const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 
 const port = process.env.PORT || 3000;
 
-app.use(cors());
+app.use(
+  cors({
+    origin: ["http://localhost:5173"],
+    credentials: true,
+  })
+);
 app.use(express.json());
+app.use(cookieParser());
 
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@kajwala.9fiaw1u.mongodb.net/?appName=kajwala`;
 
@@ -60,7 +68,50 @@ async function run() {
 
     // Users APIs
 
+    // Middlewares
+    const verifyToken = (req, res, next) => {
+      if (!req.headers.authorization) {
+        return res.status(401).send({ message: "unauthorized access" });
+      }
+      const token = req.headers.authorization.split(" ")[1];
+      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
+        if (err) {
+          return res.status(401).send({ message: "unauthorized access" });
+        }
+        req.decoded = decoded;
+        next();
+      });
+    };
+
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === "admin";
+      if (!isAdmin) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
+    const verifyStaff = async (req, res, next) => {
+      const email = req.decoded.email;
+      const staff = await staffCollection.findOne({ email });
+      const isStaff = !!staff;
+      if (!isStaff) {
+        return res.status(403).send({ message: "forbidden access" });
+      }
+      next();
+    };
+
     // Auth API
+    app.post("/jwt", async (req, res) => {
+      const user = req.body;
+      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
+        expiresIn: "1h",
+      });
+      res.send({ token });
+    });
     app.post("/auth/login", async (req, res) => {
         const { email, password } = req.body;
         
@@ -90,7 +141,7 @@ async function run() {
       res.send(result);
     });
 
-    app.get("/users", async (req, res) => {
+    app.get("/users", verifyToken, verifyAdmin, async (req, res) => {
       const limit = parseInt(req.query.limit) || 0; // 0 means no limit
       let cursor = usersCollection.find().sort({ createdAt: -1 });
       
@@ -138,7 +189,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/users/premium/:email", async (req, res) => {
+    app.patch("/users/premium/:email", verifyToken, async (req, res) => {
       const email = req.params.email;
 
       const query = { email };
@@ -173,7 +224,7 @@ async function run() {
       res.send({ role });
     });
 
-    app.delete("/users/:email", async (req, res) => {
+    app.delete("/users/:email", verifyToken, verifyAdmin, async (req, res) => {
       const email = req.params.email;
 
       const query = { email };
@@ -220,7 +271,7 @@ async function run() {
 
     // Issues APIs
 
-    app.post("/issues", async (req, res) => {
+    app.post("/issues", verifyToken, async (req, res) => {
       const issue = req.body;
       const userEmail = issue.userEmail;
 
@@ -265,7 +316,7 @@ async function run() {
       res.send(result);
     });
     
-    app.get("/citizen/stats/:email", async (req, res) => {
+    app.get("/citizen/stats/:email", verifyToken, async (req, res) => {
         const email = req.params.email;
         const query = { userEmail: email };
         
@@ -443,7 +494,7 @@ async function run() {
       res.send(result);
     });
 
-    app.patch("/issues/assign/:id", async (req, res) => {
+    app.patch("/issues/assign/:id", verifyToken, verifyAdmin, async (req, res) => {
       const id = req.params.id;
       const staffEmail = req.body.staffEmail;
       const adminEmail = req.body.adminEmail;
@@ -478,7 +529,7 @@ async function run() {
       res.send({ issueResult, staffResult, modifiedCount: issueResult.modifiedCount });
     });
 
-    app.patch("/issues/status/:id", async (req, res) => {
+    app.patch("/issues/status/:id", verifyToken, verifyStaff, async (req, res) => {
       const id = req.params.id;
       const { newStatus, staffEmail } = req.body;
 
@@ -504,7 +555,7 @@ async function run() {
     
     //  Stuff CRUD APIs
 
-app.post("/staff", async (req, res) => {
+app.post("/staff", verifyToken, verifyAdmin, async (req, res) => {
   const staff = req.body;
 
   staff.createdAt = new Date();
@@ -591,10 +642,25 @@ app.delete("/staff/:id", async (req, res) => {
 
       const issueIds = staff.assignedIssues.map((id) => new ObjectId(id));
 
-      const assignedIssues = await issuesCollection
-        .find({ _id: { $in: issueIds } })
-        .sort({ priority: -1 }) // boosted issues first
-        .toArray();
+      const assignedIssues = await issuesCollection.aggregate([
+        { $match: { _id: { $in: issueIds } } },
+        {
+          $addFields: {
+            priorityOrder: {
+              $switch: {
+                branches: [
+                  { case: { $eq: ["$priority", "high"] }, then: 3 },
+                  { case: { $eq: ["$priority", "medium"] }, then: 2 },
+                  { case: { $eq: ["$priority", "normal"] }, then: 1 },
+                  { case: { $eq: ["$priority", "low"] }, then: 0 },
+                ],
+                default: 0,
+              },
+            },
+          },
+        },
+        { $sort: { priorityOrder: -1 } },
+      ]).toArray();
 
       res.send(assignedIssues);
     });
@@ -634,7 +700,14 @@ app.delete("/staff/:id", async (req, res) => {
     });
 
 
-    app.patch("/issues/:id/status", async (req, res) => {
+    app.patch("/issues/:id/status", verifyToken, async (req, res) => {
+      const email = req.decoded.email;
+      const isAdmin = await usersCollection.findOne({ email, role: 'admin' });
+      const isStaff = await staffCollection.findOne({ email });
+
+      if (!isAdmin && !isStaff) {
+          return res.status(403).send({ message: "forbidden access" });
+      }
       const id = req.params.id;
       const { newStatus, updatedBy } = req.body;
 
@@ -668,7 +741,7 @@ app.delete("/staff/:id", async (req, res) => {
 
 
     // Admin Stats API
-    app.get("/admin/stats", async (req, res) => {
+    app.get("/admin/stats", verifyToken, verifyAdmin, async (req, res) => {
         try {
             const totalUsers = await usersCollection.countDocuments();
             const totalIssues = await issuesCollection.countDocuments();
@@ -694,7 +767,7 @@ app.delete("/staff/:id", async (req, res) => {
     });
 
     // Payments GET API
-    app.get("/payments", async (req, res) => {
+    app.get("/payments", verifyToken, verifyAdmin, async (req, res) => {
         try {
             const limit = parseInt(req.query.limit) || 0; 
             let cursor = client.db("cityWatch").collection("payments").find().sort({ date: -1 }); 
@@ -713,6 +786,24 @@ app.delete("/staff/:id", async (req, res) => {
         }
     });
 
+
+
+    app.get("/public-stats", async (req, res) => {
+      try {
+        const totalUsers = await usersCollection.countDocuments();
+        const totalIssues = await issuesCollection.countDocuments();
+        const resolvedIssues = await issuesCollection.countDocuments({ status: "resolved" });
+        
+        res.send({
+          totalUsers,
+          totalIssues,
+          resolvedIssues
+        });
+      } catch (error) {
+        console.error("Error fetching public stats:", error);
+        res.status(500).send({ message: "Failed to fetch stats" });
+      }
+    });
 
     // Send a ping to confirm a successful connection
     await client.db("admin").command({ ping: 1 });
