@@ -1,6 +1,7 @@
 const express = require("express");
 const app = express();
 require("dotenv").config();
+const stripe = require("stripe")(process.env.STRIPE_SECRET);
 
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -29,7 +30,6 @@ async function run() {
     const issuesCollection = client.db("cityWatch").collection("issues");
     const staffCollection = client.db("cityWatch").collection("staffs");
 
-<<<<<<< HEAD
 
 
 
@@ -58,8 +58,6 @@ async function run() {
 
 
 
-=======
->>>>>>> parent of 2b3e3f1 (feat: integrate Stripe for payment processing and update environment variables)
     // Users APIs
 
     // Auth API
@@ -191,7 +189,7 @@ async function run() {
 
       const paymentIntent = await stripe.paymentIntents.create({
         amount: amount,
-        currency: "bdt", 
+        currency: "bdt",
         payment_method_types: ["card"],
       });
 
@@ -272,13 +270,16 @@ async function run() {
         const query = { userEmail: email };
         
         const issues = await issuesCollection.find(query).toArray();
-        
+        const payments = await client.db("cityWatch").collection("payments").find({ email: email }).toArray();
+        const totalPayments = payments.reduce((sum, payment) => sum + (parseFloat(payment.price) || 0), 0);
+
         const stats = {
             total: issues.length,
             pending: issues.filter(i => i.status === 'pending').length,
             inProgress: issues.filter(i => i.status === 'in-progress').length,
             resolved: issues.filter(i => i.status === 'resolved').length,
             closed: issues.filter(i => i.status === 'closed').length,
+            totalPayments,
             issuesList: issues 
         };
         
@@ -311,11 +312,7 @@ async function run() {
       
       const cursor = issuesCollection
         .find(query)
-<<<<<<< HEAD
         .sort({ priority: 1, createdAt: -1 }) 
-=======
-        .sort({ priority: -1, createdAt: -1 }) // Boosted (high priority) first, then newest
->>>>>>> parent of 2b3e3f1 (feat: integrate Stripe for payment processing and update environment variables)
         .skip(skip)
         .limit(limit);
 
@@ -617,10 +614,18 @@ app.delete("/staff/:id", async (req, res) => {
         totalAssigned: issues.length,
         resolved: issues.filter((i) => i.status === "resolved").length,
         closed: issues.filter((i) => i.status === "closed").length,
+        inProgress: issues.filter((i) => i.status === 'in-progress').length,
+        pending: issues.filter((i) => i.status === 'pending').length,
         todayTasks: issues.filter(
           (i) =>
             new Date(i.updatedAt).toDateString() === new Date().toDateString()
         ).length,
+        byPriority: {
+            high: issues.filter(i => i.priority === 'high').length,
+            medium: issues.filter(i => i.priority === 'medium').length,
+            normal: issues.filter(i => i.priority === 'normal').length, 
+            low: issues.filter(i => i.priority === 'low').length,
+        }
       };
 
       res.send(stats);
