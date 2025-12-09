@@ -280,7 +280,9 @@ async function run() {
             resolved: issues.filter(i => i.status === 'resolved').length,
             closed: issues.filter(i => i.status === 'closed').length,
             totalPayments,
-            issuesList: issues 
+            totalPayments,
+            issuesList: issues,
+            paymentsList: payments 
         };
         
         res.send(stats);
