@@ -1,9 +1,15 @@
 const express = require("express");
 const app = express();
 require("dotenv").config();
-const jwt = require("jsonwebtoken");
+// const jwt = require("jsonwebtoken"); // Removed custom JWT
 const cookieParser = require("cookie-parser");
 const stripe = require("stripe")(process.env.STRIPE_SECRET);
+const admin = require("firebase-admin");
+const serviceAccount = require("./citywatch-235b9-firebase-adminsdk-fbsvc-2e2f478e58.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount)
+});
 
 const cors = require("cors");
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
@@ -12,7 +18,11 @@ const port = process.env.PORT || 3000;
 
 app.use(
   cors({
-    origin: ["http://localhost:5173"],
+    origin: [
+      "https://city-watch-mir.netlify.app",
+      "http://localhost:5173",
+      "http://localhost:5174",
+    ],
     credentials: true,
   })
 );
@@ -32,17 +42,11 @@ const client = new MongoClient(uri, {
 async function run() {
   try {
     // Connect the client to the server	(optional starting in v4.7)
-    await client.connect();
+    // await client.connect();
 
     const usersCollection = client.db("cityWatch").collection("users");
     const issuesCollection = client.db("cityWatch").collection("issues");
     const staffCollection = client.db("cityWatch").collection("staffs");
-
-
-
-
-
-
 
 
     // Payment API
@@ -63,24 +67,21 @@ async function run() {
    });
 
 
-
-
-
     // Users APIs
 
     // Middlewares
-    const verifyToken = (req, res, next) => {
+    const verifyToken = async (req, res, next) => {
       if (!req.headers.authorization) {
-        return res.status(401).send({ message: "unauthorized access" });
+        return res.status(401).send({ message: "No token provided, unauthorized access" });
       }
       const token = req.headers.authorization.split(" ")[1];
-      jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, decoded) => {
-        if (err) {
-          return res.status(401).send({ message: "unauthorized access" });
-        }
-        req.decoded = decoded;
+      try {
+        const decodedValue = await admin.auth().verifyIdToken(token);
+        req.decoded = decodedValue;
         next();
-      });
+      } catch (error) {
+        return res.status(401).send({ message: "Invalid token, unauthorized access" });
+      }
     };
 
     const verifyAdmin = async (req, res, next) => {
@@ -105,13 +106,8 @@ async function run() {
     };
 
     // Auth API
-    app.post("/jwt", async (req, res) => {
-      const user = req.body;
-      const token = jwt.sign(user, process.env.ACCESS_TOKEN_SECRET, {
-        expiresIn: "1h",
-      });
-      res.send({ token });
-    });
+    // Removed /jwt endpoint as we now use Firebase tokens directly
+    
     app.post("/auth/login", async (req, res) => {
         const { email, password } = req.body;
         
@@ -251,15 +247,7 @@ async function run() {
 
     app.post("/payments", async (req, res) => {
         const payment = req.body;
-        // Optionally save payment info to a paymentsCollection
-        // For now, we just update the user status as requested by the flow
-        // But the client calls PATCH /users/premium separately? 
-        // Better to handle it here if we want to be atomic, but let's stick to the flexible approach for now or just log it.
-        // The user requirement says "After successful payment the user becomes a premium user".
-        // It's safer to trust the server.
-        // Let's assume the client will handle the database update trigger effectively for this prototype, 
-        // OR we can save the payment and return success.
-        
+
         // Let's just create a payments collection for record keeping
         const paymentsCollection = client.db("cityWatch").collection("payments");
         const result = await paymentsCollection.insertOne(payment);
@@ -806,7 +794,7 @@ app.delete("/staff/:id", async (req, res) => {
     });
 
     // Send a ping to confirm a successful connection
-    await client.db("admin").command({ ping: 1 });
+    // await client.db("admin").command({ ping: 1 });
     console.log(
       "Pinged your deployment. You successfully connected to MongoDB!"
     );
